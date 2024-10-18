@@ -39,7 +39,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     //获取验证码
     @Override
-    public Result sendMail(String phone, HttpSession session) {
+    public Result sendCode(String phone, HttpSession session) {
         //校验手机号
         if (RegexUtils.isPhoneInvalid(phone)) {
             return Result.fail("手机号格式不正确");
@@ -48,8 +48,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         String code = RandomUtil.randomNumbers(6);
 //        将验证码保存到session中，便于用户登录进行校验
 //        session.setAttribute("code",code);
-        //new:采用Redis
-        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + "phone", code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+        //new:保存采用Redis
+        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
 
 
         //使用日志的形式获取验证码
@@ -72,8 +72,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("验证码形式不正确");
         }
         //将之前用户请求保存到Redis的验证码和请求登录的验证码进行匹配
-        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + "phone");
-        if (cacheCode != null && !cacheCode.equals(code)) {
+        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+        if (cacheCode == null || !cacheCode.equals(code)) {
             return Result.fail("验证码匹配失败");
         }
         //根据手机号判断数据库中是否有数据
@@ -86,10 +86,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         //数据库有用户信息，登录成功,并将用户信息存到Redis中,使用hash存储用户对象UserDto
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         Map<String, Object> userMap = BeanUtil.beanToMap(userDTO);   //转为hash
+        // 手动将 id 字段转换为字符串
+        if (userMap.containsKey("id")) {
+            userMap.put("id", String.valueOf(userMap.get("id")));
+        }
         String tokenKey = LOGIN_USER_KEY + token;
         stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
         stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-        return Result.ok();
+        return Result.ok(token);
     }
 
     //根据手机号创建新用户
