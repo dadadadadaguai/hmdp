@@ -13,8 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
@@ -33,7 +32,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
     /**
-     * 根据id查询商铺信息
+     * 根据id查询商铺信息(采用空对象解决缓存穿透)
      *
      * @param id
      * @return
@@ -42,11 +41,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     public Result queryById(Long id) {
         String key = CACHE_SHOP_KEY + id;
         String shopJson = stringRedisTemplate.opsForValue().get(key);
+
         if (StrUtil.isNotBlank(shopJson)) {
             return Result.ok(JSONUtil.toBean(shopJson, Shop.class));
         }
+        //redis只有空值
+        if (shopJson != null) {
+            return Result.fail("店铺不存在");
+        }
         Shop shop = this.getById(id);
         if (shop == null) {
+            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL, TimeUnit.MINUTES);//设置空对象
             return Result.fail("店铺不存在");
         }
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
