@@ -19,4 +19,16 @@ class ShopServiceImplTest {
         Result result = shopService.queryById(id);
         log.info("result:{}", result);
     }
+
+    @Test
+    void queryByIdWithPassThrough() throws InterruptedException {
+        Long id = 1L;
+        Long expireTimeSeconds = 10L;
+        shopService.addRedisCache(id, expireTimeSeconds);
+    }
+
+    @Test
+    void deleteLockKey() {
+        shopService.unLock("lock:shop:1");
+    }
 }
