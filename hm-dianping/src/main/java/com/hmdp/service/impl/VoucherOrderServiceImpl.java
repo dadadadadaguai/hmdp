@@ -1,15 +1,14 @@
 package com.hmdp.service.impl;
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
-import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.IVoucherOrderService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.hmdp.service.IVoucherService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +34,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     /**
      * 优惠券秒杀
+     * V2:解决一人一单
      *
      * @param voucherId
      * @return
      */
     @Override
-    @Transactional
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         LocalDateTime now = LocalDateTime.now();
@@ -49,6 +48,28 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         if (voucher.getStock() < 1) {
             return Result.fail("库存不足");
+        }
+        Long userId = UserHolder.getUser().getId();
+        /**
+         * 因为toString方法会每次会new一个新对象，导致锁的是同一个id的不同对象，还是没锁同一个id，采用intern()，
+         * 会从字符串常量池里面拿，第一次访问后，会直接从常量池拿，不会new一个新对象，所以不会出现锁不同对象
+         */
+        synchronized (userId.toString().intern()) {
+            //获取代理对象(启动类设置暴露代理对象，添加依赖)
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.seckillVoucherByLock(voucherId);
+        }
+    }
+
+    @Transactional
+    public Result seckillVoucherByLock(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        Integer secKillVoucherCount = this.query()
+                .eq("user_id", userId)
+                .eq("voucher_id", voucherId)
+                .count();
+        if (secKillVoucherCount > 0) {
+            return Result.fail("已重复购买");
         }
         //扣减库存
         boolean success = seckillVoucherService.update()
@@ -61,7 +82,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         long orderId = redisIdWorker.nextId("order");
         VoucherOrder voucherOrder = new VoucherOrder()
-                .setVoucherId(voucherId).setUserId(UserHolder.getUser().getId()).setId(orderId);
+                .setVoucherId(voucherId).setUserId(userId).setId(orderId);
         save(voucherOrder);
         return Result.ok(voucherOrder);
     }
