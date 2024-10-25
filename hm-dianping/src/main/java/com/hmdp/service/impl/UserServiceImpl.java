@@ -46,8 +46,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         //创建6位验证码
         String code = RandomUtil.randomNumbers(6);
-//        将验证码保存到session中，便于用户登录进行校验
-//        session.setAttribute("code",code);
         //new:保存采用Redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
 

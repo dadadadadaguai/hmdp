@@ -41,7 +41,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * V2:解决一人一单
      *
      * @param voucherId
-     * @return
+     * @return Result
      */
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -54,9 +54,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        /**
-         * 因为toString方法会每次会new一个新对象，导致锁的是同一个id的不同对象，还是没锁同一个id，采用intern()，
-         * 会从字符串常量池里面拿，第一次访问后，会直接从常量池拿，不会new一个新对象，所以不会出现锁不同对象
+        /*
+          因为toString方法会每次会new一个新对象，导致锁的是同一个id的不同对象，还是没锁同一个id，采用intern()，
+          会从字符串常量池里面拿，第一次访问后，会直接从常量池拿，不会new一个新对象，所以不会出现锁不同对象
          */
         RedisLockImpl redisLock = new RedisLockImpl("voucherOrder:" + userId, stringRedisTemplate);
         if (!redisLock.getLock(1200L)) {
