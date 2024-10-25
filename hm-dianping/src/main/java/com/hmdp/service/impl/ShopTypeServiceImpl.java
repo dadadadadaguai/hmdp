@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.hmdp.utils.RedisConstants.CACHE_SHOPTYPE_KEY;
-import static com.hmdp.utils.RedisConstants.CACHE_SHOPTYPE_TTL;
+import static com.hmdp.redis.RedisConstants.CACHE_SHOPTYPE_KEY;
+import static com.hmdp.redis.RedisConstants.CACHE_SHOPTYPE_TTL;
 
 /**
  * <p>

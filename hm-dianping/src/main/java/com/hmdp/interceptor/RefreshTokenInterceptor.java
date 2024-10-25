@@ -1,8 +1,10 @@
-package com.hmdp.utils;
+package com.hmdp.interceptor;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.UserDTO;
+import com.hmdp.redis.RedisConstants;
+import com.hmdp.constant.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -11,7 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
+import static com.hmdp.redis.RedisConstants.LOGIN_USER_KEY;
 
 //全局拦截器:统一刷新过期时间
 public class RefreshTokenInterceptor implements HandlerInterceptor {

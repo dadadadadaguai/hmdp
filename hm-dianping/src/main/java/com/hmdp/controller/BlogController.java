@@ -8,8 +8,8 @@ import com.hmdp.entity.Blog;
 import com.hmdp.entity.User;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
-import com.hmdp.utils.SystemConstants;
-import com.hmdp.utils.UserHolder;
+import com.hmdp.constant.SystemConstants;
+import com.hmdp.constant.UserHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;

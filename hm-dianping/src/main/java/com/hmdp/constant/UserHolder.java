@@ -1,4 +1,4 @@
-package com.hmdp.utils;
+package com.hmdp.constant;
 
 import com.hmdp.dto.UserDTO;
 
