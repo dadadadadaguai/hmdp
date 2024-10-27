@@ -34,6 +34,12 @@
             <artifactId>aspectjweaver</artifactId>
             <version>1.9.7</version> <!-- 请根据需要选择合适的版本 -->
         </dependency>
+        <!--导入Redission -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.13.4</version>
+        </dependency>
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>

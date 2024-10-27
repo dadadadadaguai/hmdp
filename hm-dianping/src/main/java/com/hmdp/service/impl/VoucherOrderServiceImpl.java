@@ -7,8 +7,10 @@ import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.redis.RedisIdWorker;
-import com.hmdp.redis.RedisLockImpl;
 import com.hmdp.service.IVoucherOrderService;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -29,11 +31,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private final RedisIdWorker redisIdWorker;
     private final SeckillVoucherServiceImpl seckillVoucherService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final RedissonClient redissonClient;
 
-    public VoucherOrderServiceImpl(RedisIdWorker redisIdWorker, SeckillVoucherServiceImpl seckillVoucherService, StringRedisTemplate stringRedisTemplate) {
+    public VoucherOrderServiceImpl(RedisIdWorker redisIdWorker, SeckillVoucherServiceImpl seckillVoucherService, StringRedisTemplate stringRedisTemplate, RedissonClient redissonClient) {
         this.seckillVoucherService = seckillVoucherService;
         this.redisIdWorker = redisIdWorker;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.redissonClient = redissonClient;
     }
 
     /**
@@ -50,6 +54,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (voucher.getBeginTime().isAfter(now)) {
             return Result.fail("秒杀活动未开始");
         }
+        if (voucher.getEndTime().isBefore(now)) {
+            return Result.fail("秒杀活动已结束");
+        }
         if (voucher.getStock() < 1) {
             return Result.fail("库存不足");
         }
@@ -58,8 +65,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
           因为toString方法会每次会new一个新对象，导致锁的是同一个id的不同对象，还是没锁同一个id，采用intern()，
           会从字符串常量池里面拿，第一次访问后，会直接从常量池拿，不会new一个新对象，所以不会出现锁不同对象
          */
-        RedisLockImpl redisLock = new RedisLockImpl("voucherOrder:" + userId, stringRedisTemplate);
-        if (!redisLock.getLock(1200L)) {
+//        RedisLockImpl redisLock = new RedisLockImpl("voucherOrder:" + userId, stringRedisTemplate);
+        RLock redissonLock = redissonClient.getLock("voucherOrder:" + userId);
+        if (!redissonLock.tryLock()) {
             return Result.fail("请勿重复下单");
         }
         try {
@@ -67,7 +75,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.seckillVoucherByLock(voucherId);
         } finally {
-            redisLock.unLock();
+            redissonLock.unlock();
         }
     }
 
