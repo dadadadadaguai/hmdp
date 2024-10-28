@@ -3,20 +3,18 @@ package com.hmdp.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.constant.UserHolder;
 import com.hmdp.dto.Result;
-import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.redis.RedisIdWorker;
 import com.hmdp.service.IVoucherOrderService;
-import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.RedisClient;
-import org.springframework.aop.framework.AopContext;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.Collections;
 
 /**
  * <p>
@@ -40,6 +38,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         this.redissonClient = redissonClient;
     }
 
+    private static final DefaultRedisScript<Long> SECKILL_SCRIPTS;
+
+    static {
+        SECKILL_SCRIPTS = new DefaultRedisScript<>();
+        SECKILL_SCRIPTS.setLocation(new ClassPathResource("seckill.lua"));
+        SECKILL_SCRIPTS.setResultType(Long.class);
+    }
+
     /**
      * 优惠券秒杀
      * V2:解决一人一单
@@ -48,6 +54,19 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * @return Result
      */
     @Override
+    public Result seckillVoucher(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        Long result = stringRedisTemplate.execute(SECKILL_SCRIPTS, Collections.emptyList(), voucherId.toString(), userId.toString());
+        int r = result.intValue();
+        if (r != 0) {
+            return r == 2 ? Result.fail("请勿重复下单") : Result.fail("库存不足");
+        }
+        long orderId = redisIdWorker.nextId("order");
+        //TODO 保存到阻塞队列
+
+        return Result.ok(orderId);
+    }
+/*    @Override
     public Result seckillVoucher(Long voucherId) {
         SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
         LocalDateTime now = LocalDateTime.now();
@@ -61,10 +80,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
-        /*
+        *//*
           因为toString方法会每次会new一个新对象，导致锁的是同一个id的不同对象，还是没锁同一个id，采用intern()，
           会从字符串常量池里面拿，第一次访问后，会直接从常量池拿，不会new一个新对象，所以不会出现锁不同对象
-         */
+         *//*
 //        RedisLockImpl redisLock = new RedisLockImpl("voucherOrder:" + userId, stringRedisTemplate);
         RLock redissonLock = redissonClient.getLock("voucherOrder:" + userId);
         if (!redissonLock.tryLock()) {
@@ -77,7 +96,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         } finally {
             redissonLock.unlock();
         }
-    }
+    }*/
 
     @Transactional
     public Result seckillVoucherByLock(Long voucherId) {
