@@ -8,10 +8,14 @@ import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
+import com.hmdp.redis.RedisConstants;
 import com.hmdp.service.IBlogService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.service.IUserService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -23,13 +27,16 @@ import java.util.List;
  * @author dadaguai
  * @since 2021-12-22
  */
+@Slf4j
 @Service
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
 
     private final IUserService userService;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    public BlogServiceImpl(IUserService userService) {
+    public BlogServiceImpl(IUserService userService, StringRedisTemplate stringRedisTemplate) {
         this.userService = userService;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     @Override
@@ -40,18 +47,18 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         // 获取当前页数据
         List<Blog> records = page.getRecords();
-        // 查询用户
-        records.forEach(this::queryUserByBlog);
+        //添加用户和点赞信息
+        records.forEach(this::addIsLike);
         return Result.ok(records);
     }
 
     @Override
     public Result queryBlogById(Long id) {
         Blog blog = this.getById(id);
-        if (blog==null){
+        if (blog == null) {
             return Result.fail("笔记不存在");
         }
-        queryUserByBlog(blog);
+        addIsLike(blog);
         return Result.ok(blog);
     }
 
@@ -67,11 +74,27 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(records);
     }
 
+    /**
+     * 点赞
+     *
+     * @param id
+     * @return
+     */
+    @Transactional
     @Override
     public Result likeBlog(Long id) {
-        // 修改点赞数量
-        this.update()
-                .setSql("liked = liked + 1").eq("id", id).update();
+        //判断是点赞还是取消赞的操作
+        String userId = String.valueOf(UserHolder.getUser().getId());
+        Boolean isLike = stringRedisTemplate.opsForSet().isMember(RedisConstants.BLOG_LIKED_KEY + id, userId);
+        if (Boolean.TRUE.equals(isLike)) {
+            stringRedisTemplate.opsForSet().remove(RedisConstants.BLOG_LIKED_KEY + id, userId);
+            this.update().setSql("liked=liked-1").eq("id", id).update();
+            log.info("取消点赞");
+            return Result.ok();
+        }
+        stringRedisTemplate.opsForSet().add(RedisConstants.BLOG_LIKED_KEY + id, userId);
+        this.update().setSql("liked=liked+1").eq("id", id).update();
+        log.info("点赞成功");
         return Result.ok();
     }
 
@@ -91,5 +114,14 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         User user = userService.getById(userId);
         blog.setName(user.getNickName());
         blog.setIcon(user.getIcon());
+    }
+
+    private void addIsLike(Blog blog) {
+        queryUserByBlog(blog);
+        Long userId = UserHolder.getUser().getId();
+        Boolean isLiked = stringRedisTemplate.opsForSet()
+                .isMember(RedisConstants.BLOG_LIKED_KEY + blog.getId(), String.valueOf(userId));
+        //已经点过赞
+        blog.setIsLike(Boolean.TRUE.equals(isLiked));
     }
 }

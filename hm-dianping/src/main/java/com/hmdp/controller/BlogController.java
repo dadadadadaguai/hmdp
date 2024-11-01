@@ -34,7 +34,7 @@ public class BlogController {
     public Result saveBlog(@RequestBody Blog blog) {
         return blogService.saveBlog(blog);
     }
-
+    //点赞or取消点赞
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
         return blogService.likeBlog(id);
