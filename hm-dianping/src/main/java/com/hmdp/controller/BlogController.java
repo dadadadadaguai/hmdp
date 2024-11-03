@@ -30,10 +30,12 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
+
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         return blogService.saveBlog(blog);
     }
+
     //点赞or取消点赞
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
@@ -55,4 +57,10 @@ public class BlogController {
     public Result queryBlogById(@PathVariable Long id) {
         return blogService.queryBlogById(id);
     }
+
+    @GetMapping("/likes/{id}")
+    public Result queryTop5BlogLikes(@PathVariable Long id) {
+        return blogService.queryTop5BlogLikes(id);
+    }
+
 }
