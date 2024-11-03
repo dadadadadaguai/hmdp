@@ -22,13 +22,28 @@ public class FollowController {
         this.followService = followService;
     }
 
+    /**
+     * 关注或取关
+     * @param id
+     * @param isFollow
+     * @return
+     */
     @PutMapping("/{id}/{isFollow}")
     public Result follow(@PathVariable("id") Long id, @PathVariable("isFollow") Boolean isFollow) {
         return followService.follow(id, isFollow);
     }
 
+    /**
+     * 判断是否关注
+     * @param id
+     * @return
+     */
     @GetMapping("/or/not/{id}")
     public Result isFollow(@PathVariable("id") Long id) {
         return followService.isFollow(id);
+    }
+    @GetMapping("/common/{id}")
+    public Result commonFollow(@PathVariable("id") Long id){
+        return followService.commonFollow(id);
     }
 }
