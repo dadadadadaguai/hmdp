@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.hmdp.constant.UserHolder;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -17,6 +18,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -108,6 +110,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         return Result.ok(userDTO);
+    }
+
+    /**
+     * 登出
+     *
+     * @return
+     */
+    @Override
+    public Result logout(HttpServletRequest request) {
+        String tokenKey = LOGIN_USER_KEY + request.getHeader("authorization");
+        //删除这个key
+        Boolean isDelete = stringRedisTemplate.delete(tokenKey);
+        if (Boolean.TRUE.equals(isDelete)) {
+            return Result.ok();
+        }
+        return Result.fail("登出失败");
     }
 
     //根据手机号创建新用户
