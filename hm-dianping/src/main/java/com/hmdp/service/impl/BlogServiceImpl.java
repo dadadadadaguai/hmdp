@@ -9,12 +9,14 @@ import com.hmdp.constant.UserHolder;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.redis.RedisConstants;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,10 +41,12 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     public static final int Max_TopBlogLikes = 5;
     private final IUserService userService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final FollowServiceImpl followService;
 
-    public BlogServiceImpl(IUserService userService, StringRedisTemplate stringRedisTemplate) {
+    public BlogServiceImpl(IUserService userService, StringRedisTemplate stringRedisTemplate, FollowServiceImpl followService) {
         this.userService = userService;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.followService = followService;
     }
 
     @Override
@@ -105,13 +109,29 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok();
     }
 
+    /**
+     * 发布以及推送给关注用户发布的博客
+     *
+     * @param blog
+     * @return
+     */
+    @Transactional
     @Override
-    public Result saveBlog(Blog blog) {
+    public Result saveBlog(@NotNull Blog blog) {
         // 获取登录用户
         UserDTO user = UserHolder.getUser();
         blog.setUserId(user.getId());
         // 保存探店博文
-        this.save(blog);
+        boolean isSave = this.save(blog);
+        if (!isSave) {
+            return Result.fail("发布失败");
+        }
+        List<Follow> followList = followService.query().eq("follow_user_id", user.getId()).list();
+        for (Follow follow : followList) {
+            stringRedisTemplate.opsForZSet()
+                    .add(RedisConstants.FEED__FOLLOW_KEY + follow.getUserId(),
+                            blog.getId().toString(), System.currentTimeMillis());
+        }
         // 返回id
         return Result.ok(blog.getId());
     }
@@ -144,7 +164,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(blogs);
     }
 
-    private void queryUserByBlog(Blog blog) {
+    private void queryUserByBlog(@NotNull Blog blog) {
         Long userId = blog.getUserId();
         User user = userService.getById(userId);
         blog.setName(user.getNickName());
