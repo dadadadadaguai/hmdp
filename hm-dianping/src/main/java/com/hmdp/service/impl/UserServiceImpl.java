@@ -14,12 +14,16 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.constant.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -126,6 +130,41 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.ok();
         }
         return Result.fail("登出失败");
+    }
+
+    @Override
+    public Result sign() {
+        Long userId = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String key = USER_SIGN_KEY + userId + ":" + now.format(DateTimeFormatter.ofPattern("yyyy:MM"));
+        int day = now.getDayOfMonth();
+        stringRedisTemplate.opsForValue().setBit(key, day - 1, true);
+        return Result.ok();
+    }
+
+    @Override
+    public Result signCount() {
+        Long userId = UserHolder.getUser().getId();
+        LocalDateTime now = LocalDateTime.now();
+        String key = USER_SIGN_KEY + userId + ":" + now.format(DateTimeFormatter.ofPattern("yyyy:MM"));
+        int day = now.getDayOfMonth();
+        List<Long> signList = stringRedisTemplate.opsForValue()
+                .bitField(key, BitFieldSubCommands.create().get(BitFieldSubCommands.BitFieldType.unsigned(day))
+                        .valueAt(0));
+        if (signList == null || signList.isEmpty()) {
+            return Result.ok(0);
+        }
+        //签到记录数
+        Long num = signList.get(0);
+        if (num == 0) {
+            return Result.ok(0);
+        }
+        int count = 0;
+        while ((num & 1) == 1) {
+            count++;
+            num >>>= 1;
+        }
+        return Result.ok(count);
     }
 
     //根据手机号创建新用户

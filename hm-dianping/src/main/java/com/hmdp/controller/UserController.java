@@ -86,8 +86,25 @@ public class UserController {
         // 返回
         return Result.ok(info);
     }
-    @GetMapping("{id}")
+
+    @GetMapping("/{id}")
     public Result queryUserById(@PathVariable("id") Long id) {
         return userService.queryUserById(id);
+    }
+
+    /**
+     * 签到
+     * @return
+     */
+    @PostMapping("/sign")
+    public Result sign() {
+        return userService.sign();
+    }
+    /**
+     * 连续签到天数统计
+     */
+    @GetMapping("/sign/count")
+    public Result signCount() {
+        return userService.signCount();
     }
 }
